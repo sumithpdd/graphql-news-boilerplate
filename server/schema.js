@@ -8,6 +8,7 @@ import {
     GraphQLInputObjectType,
 } from 'graphql';
 import { ObjectID } from 'mongodb';
+import { compareSync, hashSync } from 'bcrypt';
 
 const userType = new GraphQLObjectType({
     name: 'User',
@@ -83,29 +84,29 @@ const queryType = new GraphQLObjectType({
     fields: () => ({
         allLinks: {
             type: new GraphQLList(linkType),
-            resolve: async (_, data, { db: { Links } }) => 
-            await Links.find({}).toArray(),
+            resolve: async (_, data, { db: { Links } }) =>
+                await Links.find({}).toArray(),
         },
         link: {
             type: linkType,
             args: {
                 _id: { type: GraphQLID },
             },
-            resolve: async (_id, data, { db: { Links } }) => 
-            await Links.findOne(ObjectID(_id)),
+            resolve: async (_id, data, { db: { Links } }) =>
+                await Links.findOne(ObjectID(_id)),
         },
         allUsers: {
             type: new GraphQLList(userType),
-            resolve: async (_, data, { db: { Users } }) => 
-            await Users.find({}).toArray(),
+            resolve: async (_, data, { db: { Users } }) =>
+                await Users.find({}).toArray(),
         },
         user: {
             type: userType,
             args: {
                 _id: { type: GraphQLID },
             },
-            resolve: async (_id, data, { db: { Users } }) => 
-            await Users.findOne(ObjectID(_id)),
+            resolve: async (_id, data, { db: { Users } }) =>
+                await Users.findOne(ObjectID(_id)),
         },
     }),
 });
@@ -174,9 +175,49 @@ const mutationType = new GraphQLObjectType({
 
                 return Object.assign({ _id: response.insertedIds[0] }, data);
             },
+        },
+        createUser: {
+            type: userType,
+            args: {
+                username: { type: new GraphQLNonNull(GraphQLString) },
+                authProvider: { type: new GraphQLNonNull(provider) },
+            },
+            resolve: async (_, { username, authProvider }, { db: { Users } }) => {
+                const password = hashSync(authProvider.password,10);
+                const newUser = {
+                    username,
+                    email: authProvider.email,
+                    password: password,
+                };
+                const response = await Users.insert(newUser);
+
+                return Object.assign({ _id: response.insertedIds[0] }, newUser);
+
+            }
+        },
+        signInUser: {
+            type: userType,
+            args: {
+                authProvider: { type: new GraphQLNonNull(provider) },
+            },
+            resolve: async (_, { authProvider }, { db: { Users } }) => {
+                const user = await Users.findOne({ email: authProvider.email });
+                if (compareSync(authProvider.password , user.password)) {
+                    return Object.assign({ token: `token-${user.email}` }, user);
+                }
+                return null;
+
+            }
         }
 
     })
+});
+const provider = new GraphQLInputObjectType({
+    name: 'authProvider',
+    fields: {
+        email: { type: new GraphQLNonNull(GraphQLString) },
+        password: { type: new GraphQLNonNull(GraphQLString) },
+    }
 });
 const schema = new GraphQLSchema({ query: queryType, mutation: mutationType });
 
