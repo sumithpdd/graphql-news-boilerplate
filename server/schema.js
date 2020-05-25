@@ -67,8 +67,8 @@ const linkType = new GraphQLObjectType({
             args: {
                 author: { type: GraphQLID },
             },
-            resolve: async (_, { author }, { db: { Users } }) =>
-                await Users.findOne(ObjectID(author)),
+            resolve: async (_, { author }, { dataloaders: { userLoader } }) =>
+                await userLoader.load(ObjectID(author)),
         },
         comments: {
             type: new GraphQLList(commentsType),
@@ -114,7 +114,7 @@ const queryType = new GraphQLObjectType({
 const mutationType = new GraphQLObjectType({
     name: 'Mutation',
     fields: () => ({
-        
+
         upvoteLink: {
             type: linkType,
             args: {
@@ -144,7 +144,7 @@ const mutationType = new GraphQLObjectType({
                 url: { type: new GraphQLNonNull(GraphQLString) },
                 description: { type: GraphQLString },
             },
-            
+
             resolve: async (_, data, { db: { Links, user } }) => {
                 if (user) {
                     const link = Object.assign(
@@ -161,7 +161,7 @@ const mutationType = new GraphQLObjectType({
                 }
                 return null;
             },
-        },       
+        },
         createUser: {
             type: userType,
             args: {

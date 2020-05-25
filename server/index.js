@@ -5,6 +5,7 @@ import { MongoClient } from 'mongodb';
 import jwt from 'express-jwt';
 import schema from './schema';
 import auth from './utils/auth';
+import buildDataLoaders from './utils/dataloader';
 
 const MONGO_URL = 'mongodb://localhost:27017/graphql-news';
 
@@ -22,7 +23,10 @@ const start = async () => {
       const buildOptions = async req => {
         const user = await auth(req, db.Users);
         return {
-          context: { db, user },
+          context: {
+            dataloader:buildDataLoaders(db),
+            db, 
+            user },
           schema,
           graphiql: true,
         }
