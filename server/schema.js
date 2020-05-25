@@ -114,24 +114,7 @@ const queryType = new GraphQLObjectType({
 const mutationType = new GraphQLObjectType({
     name: 'Mutation',
     fields: () => ({
-        createLink: {
-            type: linkType,
-            args: {
-                url: { type: GraphQLString },
-                description: { type: GraphQLString },
-            },
-            resolve: async (_, data, { db: { Links } }) => {
-                const link = Object.assign(
-                    {
-                        score: 0,
-                        comments: [],
-                    },
-                    data
-                );
-                const res = await Links.insert(link);
-                return Object.assign({ _id: res.insertedIds[0] }, data);
-            },
-        },
+        
         upvoteLink: {
             type: linkType,
             args: {
@@ -161,21 +144,24 @@ const mutationType = new GraphQLObjectType({
                 url: { type: new GraphQLNonNull(GraphQLString) },
                 description: { type: GraphQLString },
             },
-            resolve: async (_, data, { db: { Links }, user }) => {
-                const link = Object.assign(
-                    {
-                        author: user && user._id, // The signed in user is our author
-                        score: 0,
-                        comments: [],
-                    },
-                    data
-                );
+            
+            resolve: async (_, data, { db: { Links, user } }) => {
+                if (user) {
+                    const link = Object.assign(
+                        {
+                            author: user && user._id,
+                            score: 0,
+                            comments: [],
+                        },
+                        data
+                    );
+                    const res = await Links.insert(link);
+                    return Object.assign({ _id: res.insertedIds[0] }, data);
 
-                const response = await Links.insert(link);
-
-                return Object.assign({ _id: response.insertedIds[0] }, data);
+                }
+                return null;
             },
-        },
+        },       
         createUser: {
             type: userType,
             args: {
@@ -183,7 +169,7 @@ const mutationType = new GraphQLObjectType({
                 authProvider: { type: new GraphQLNonNull(provider) },
             },
             resolve: async (_, { username, authProvider }, { db: { Users } }) => {
-                const password = hashSync(authProvider.password,10);
+                const password = hashSync(authProvider.password, 10);
                 const newUser = {
                     username,
                     email: authProvider.email,
@@ -202,7 +188,7 @@ const mutationType = new GraphQLObjectType({
             },
             resolve: async (_, { authProvider }, { db: { Users } }) => {
                 const user = await Users.findOne({ email: authProvider.email });
-                if (compareSync(authProvider.password , user.password)) {
+                if (compareSync(authProvider.password, user.password)) {
                     return Object.assign({ token: `token-${user.email}` }, user);
                 }
                 return null;
